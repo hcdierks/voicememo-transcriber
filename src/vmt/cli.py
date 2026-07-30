@@ -93,8 +93,21 @@ def process(
 
 
 @app.command()
-def review(recording_id: str) -> None:
-    """Interactively rename Speaker N aliases to real names for one recording."""
+def review(
+    recording_id: str,
+    alias: str = typer.Option(
+        None, "--alias", help="Alias to rename, e.g. 'Speaker 1'. Requires --name; skips the interactive prompt."
+    ),
+    name: str = typer.Option(
+        None, "--name", help="Real name to assign to --alias. Requires --alias."
+    ),
+) -> None:
+    """Rename Speaker N aliases to real names for one recording.
+
+    Interactive by default (prompts for each unlabeled alias). Pass both
+    --alias and --name to rename a single alias non-interactively instead,
+    e.g. for scripting: `vmt review <id> --alias "Speaker 1" --name Jane`.
+    """
     config = load_config()
     json_path = config.transcripts_dir / f"{recording_id}.json"
     md_path = config.transcripts_dir / f"{recording_id}.md"
@@ -104,21 +117,33 @@ def review(recording_id: str) -> None:
 
     transcript = read_transcript(json_path)
     registry = SpeakerRegistry(config.registry_path, config.embeddings_dir)
-
     aliases = list_aliases(transcript)
+
+    if alias is not None or name is not None:
+        if alias is None or name is None:
+            typer.echo("--alias and --name must be given together.", err=True)
+            raise typer.Exit(code=1)
+        if alias not in aliases:
+            typer.echo(f"{alias} is not an unlabeled speaker in this transcript.", err=True)
+            raise typer.Exit(code=1)
+        transcript = apply_rename_and_enroll(config, transcript, alias, name, registry)
+        rewrite_transcript(json_path, md_path, transcript)
+        typer.echo(f"Saved {alias} -> {name}")
+        return
+
     if not aliases:
         typer.echo("No unlabeled speakers in this transcript.")
         return
 
-    for alias in aliases:
-        example = sample_line(transcript, alias) or ""
-        typer.echo(f'\n{alias}: "{example[:120]}"')
-        new_name = typer.prompt(f"Name for {alias} (blank to skip)", default="", show_default=False)
+    for alias_ in aliases:
+        example = sample_line(transcript, alias_) or ""
+        typer.echo(f'\n{alias_}: "{example[:120]}"')
+        new_name = typer.prompt(f"Name for {alias_} (blank to skip)", default="", show_default=False)
         if not new_name:
             continue
-        transcript = apply_rename_and_enroll(config, transcript, alias, new_name, registry)
+        transcript = apply_rename_and_enroll(config, transcript, alias_, new_name, registry)
         rewrite_transcript(json_path, md_path, transcript)
-        typer.echo(f"Saved {alias} -> {new_name}")
+        typer.echo(f"Saved {alias_} -> {new_name}")
 
 
 @speakers_app.command("list")
