@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+
+# All local data: recordings, transcripts, speaker registry/embeddings, manifest.
+# None of this belongs in git -- it's private and machine-local.
+data/
+
+.env
+.DS_Store
