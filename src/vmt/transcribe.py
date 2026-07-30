@@ -27,7 +27,9 @@ def transcribe_and_diarize(
     )
     result = whisperx.align(result["segments"], align_model, align_metadata, audio, device)
 
-    diarize_model = whisperx.diarize.DiarizationPipeline(use_auth_token=hf_token, device=device)
+    diarize_model = whisperx.diarize.DiarizationPipeline(
+        model_name="pyannote/speaker-diarization-3.1", token=hf_token, device=device
+    )
     diarize_segments = diarize_model(audio)
     result = whisperx.assign_word_speakers(diarize_segments, result)
 

@@ -127,13 +127,54 @@ def resolve_speakers(
     ]
 
 
+def _load_waveform(audio_path: Path, sample_rate: int = 16000) -> dict:
+    """Decode audio to an in-memory mono waveform via an ffmpeg subprocess.
+
+    Bypasses pyannote's built-in file decoding (torchcodec), which requires
+    ffmpeg 4-7 and is incompatible with newer Homebrew ffmpeg builds. This
+    mirrors how whisperx itself loads audio.
+    """
+    import subprocess
+
+    import torch
+
+    cmd = [
+        "ffmpeg",
+        "-nostdin",
+        "-threads",
+        "0",
+        "-i",
+        str(audio_path),
+        "-f",
+        "s16le",
+        "-ac",
+        "1",
+        "-acodec",
+        "pcm_s16le",
+        "-ar",
+        str(sample_rate),
+        "-",
+    ]
+    out = subprocess.run(cmd, capture_output=True, check=True).stdout
+    samples = np.frombuffer(out, np.int16).astype(np.float32) / 32768.0
+    waveform = torch.from_numpy(samples).unsqueeze(0)  # (channel, time)
+    return {"waveform": waveform, "sample_rate": sample_rate}
+
+
 def extract_embedding(audio_path: Path, start: float, end: float, hf_token: str | None) -> np.ndarray:
     """Extract a voiceprint for a time range using pyannote's embedding model.
 
     Imported lazily so unit tests for matching logic don't need torch/pyannote.
     """
-    from pyannote.audio import Inference
+    from pyannote.audio import Inference, Model
     from pyannote.core import Segment as PyannoteSegment
 
-    inference = Inference("pyannote/embedding", use_auth_token=hf_token, window="whole")
-    return np.asarray(inference.crop(str(audio_path), PyannoteSegment(start, end)))
+    model = Model.from_pretrained("pyannote/embedding", token=hf_token)
+    inference = Inference(model, window="whole")
+    file = _load_waveform(audio_path)
+
+    duration = file["waveform"].shape[-1] / file["sample_rate"]
+    end = min(end, duration - (1 / file["sample_rate"]))
+    start = min(start, end)
+
+    return np.asarray(inference.crop(file, PyannoteSegment(start, end))).reshape(-1)
