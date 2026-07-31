@@ -30,8 +30,9 @@ Voice Memos folder ──> discovery.py ──> manifest.py (dedup)
 - **speakers.py** — owns `data/speakers/registry.json` (`{speaker_id: {name, embedding_file}}`) and `data/speakers/embeddings/*.npy`. For each distinct `local_speaker` in a recording, picks its longest contiguous segment, extracts a voiceprint via pyannote's embedding model, and compares (cosine similarity) against the registry. A match above `SIMILARITY_THRESHOLD` (default 0.75, configurable) resolves to that speaker's name; otherwise the local label is renumbered into a recording-scoped alias (`Speaker 1`, `Speaker 2`, ...) in order of first appearance.
 - **output.py** — merges resolved speaker labels back into the segment list (already time-ordered from whisperx), writes `data/transcripts/<recording_id>.json` (full structured data) and `.md` (readable `**Speaker 1** [00:01:23] text` per line).
 - **review.py** — loads a transcript JSON, presents aliases and a sample line of dialogue for each, prompts for a real name (or skip), rewrites the transcript files with the new name, and calls into `speakers.py` to save that alias's embedding under the given name.
+- **viewer.py** — renders a self-contained HTML page for a transcript: an `<audio>` element pointing directly at the original recording (`file://`, nothing copied) plus the segment list below it, color-coded by speaker, each line clickable to seek playback there, with the currently-playing segment auto-highlighted via `timeupdate`. Used to visually validate diarization/speaker-matching accuracy against the real audio.
 - **config.py** — resolves settings from `~/.config/vmt/config.toml`, falling back to env vars (`VMT_DATA_DIR`, `HF_TOKEN`, `VMT_WHISPER_MODEL`, `VMT_SIMILARITY_THRESHOLD`) and then defaults. Default data dir: `<repo>/data`.
-- **cli.py** — Typer app wiring `scan`, `process`, `review`, `speakers list/rename/merge` to the modules above.
+- **cli.py** — Typer app wiring `scan`, `process`, `review`, `view`, `speakers list/rename/merge` to the modules above.
 
 ## Data formats
 

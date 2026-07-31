@@ -11,6 +11,7 @@ from vmt.manifest import Manifest
 from vmt.output import read_transcript, rewrite_transcript, write_transcript
 from vmt.review import apply_rename_and_enroll, list_aliases, sample_line
 from vmt.speakers import SpeakerRegistry, extract_embedding, resolve_speakers
+from vmt.viewer import render_html
 
 app = typer.Typer(help="Local transcription and speaker diarization for Voice Memos.")
 speakers_app = typer.Typer(help="Manage the known-speaker registry.")
@@ -144,6 +145,31 @@ def review(
         transcript = apply_rename_and_enroll(config, transcript, alias_, new_name, registry)
         rewrite_transcript(json_path, md_path, transcript)
         typer.echo(f"Saved {alias_} -> {new_name}")
+
+
+@app.command()
+def view(recording_id: str) -> None:
+    """Generate and open an HTML viewer: audio player synced to the transcript,
+    color-coded by speaker, click any line to jump playback there."""
+    config = load_config()
+    json_path = config.transcripts_dir / f"{recording_id}.json"
+    if not json_path.exists():
+        typer.echo(f"No transcript found for {recording_id}.", err=True)
+        raise typer.Exit(code=1)
+
+    transcript = read_transcript(json_path)
+    audio_path = config.recordings_dir / transcript["source_file"]
+    if not audio_path.exists():
+        typer.echo(f"Source audio not found at {audio_path}.", err=True)
+        raise typer.Exit(code=1)
+
+    html_path = config.transcripts_dir / f"{recording_id}.html"
+    html_path.write_text(render_html(transcript, audio_path))
+    typer.echo(f"-> {html_path}")
+
+    import subprocess
+
+    subprocess.run(["open", str(html_path)], check=False)
 
 
 @speakers_app.command("list")

@@ -120,6 +120,18 @@ vmt speakers rename OLD NEW
 vmt speakers merge SOURCE INTO   # two aliases turned out to be the same person
 ```
 
+### 4. Validate against the audio
+
+```
+vmt view <recording_id>
+```
+Generates `data/transcripts/<recording_id>.html` and opens it in your
+browser: an audio player (playing the original recording directly — nothing
+copied) with the transcript below it, color-coded by speaker. Click any line
+to jump playback there; the currently-playing line highlights automatically.
+Use this to sanity-check diarization/speaker-matching accuracy before
+running `vmt review` on a batch.
+
 ## Configuration
 
 `~/.config/vmt/config.toml` (all optional, env vars override):
