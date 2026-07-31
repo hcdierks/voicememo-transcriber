@@ -161,15 +161,33 @@ def _load_waveform(audio_path: Path, sample_rate: int = 16000) -> dict:
     return {"waveform": waveform, "sample_rate": sample_rate}
 
 
+_embedding_model_cache: dict[str, object] = {}
+
+
+def _get_embedding_model(hf_token: str | None):
+    """Load pyannote's embedding model once per process and cache it.
+
+    Loading it takes several seconds; in a long-lived process (the `vmt view`
+    webserver, handling repeated renames) reloading it from scratch on every
+    call is the dominant cost and makes the UI feel unresponsive/stuck.
+    """
+    key = hf_token or ""
+    if key not in _embedding_model_cache:
+        from pyannote.audio import Model
+
+        _embedding_model_cache[key] = Model.from_pretrained("pyannote/embedding", token=hf_token)
+    return _embedding_model_cache[key]
+
+
 def extract_embedding(audio_path: Path, start: float, end: float, hf_token: str | None) -> np.ndarray:
     """Extract a voiceprint for a time range using pyannote's embedding model.
 
     Imported lazily so unit tests for matching logic don't need torch/pyannote.
     """
-    from pyannote.audio import Inference, Model
+    from pyannote.audio import Inference
     from pyannote.core import Segment as PyannoteSegment
 
-    model = Model.from_pretrained("pyannote/embedding", token=hf_token)
+    model = _get_embedding_model(hf_token)
     inference = Inference(model, window="whole")
     file = _load_waveform(audio_path)
 

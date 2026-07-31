@@ -23,6 +23,7 @@ class Config:
     whisper_model: str
     similarity_threshold: float
     hf_token: str | None
+    viewer_port: int
 
     @property
     def manifest_path(self) -> Path:
@@ -70,6 +71,7 @@ def load_config(repo_root: Path | None = None) -> Config:
         os.environ.get("VMT_SIMILARITY_THRESHOLD", toml_cfg.get("similarity_threshold", 0.75))
     )
     hf_token = os.environ.get("HF_TOKEN", toml_cfg.get("hf_token"))
+    viewer_port = int(os.environ.get("VMT_VIEWER_PORT", toml_cfg.get("viewer_port", 8743)))
 
     return Config(
         data_dir=data_dir,
@@ -77,4 +79,5 @@ def load_config(repo_root: Path | None = None) -> Config:
         whisper_model=whisper_model,
         similarity_threshold=similarity_threshold,
         hf_token=hf_token,
+        viewer_port=viewer_port,
     )

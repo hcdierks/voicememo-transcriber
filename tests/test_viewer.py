@@ -1,5 +1,4 @@
 import re
-from pathlib import Path
 
 from vmt.viewer import render_html
 
@@ -23,22 +22,18 @@ def _transcript():
     }
 
 
-def test_audio_src_is_file_url_with_encoded_path(tmp_path: Path):
-    audio_path = tmp_path / "20260630 101502.m4a"
-    audio_path.write_bytes(b"fake audio")
-
-    out = render_html(_transcript(), audio_path)
-
-    assert "file://" in out
-    assert "20260630%20101502.m4a" in out
+def test_audio_src_uses_the_given_url():
+    out = render_html("rec1", _transcript(), audio_url="/audio/rec1")
+    assert 'src="/audio/rec1"' in out
 
 
-def test_each_segment_rendered_with_timestamp_and_text(tmp_path: Path):
-    audio_path = tmp_path / "memo.m4a"
-    audio_path.write_bytes(b"x")
+def test_recording_id_embedded_for_client_side_use():
+    out = render_html("abc123", _transcript(), audio_url="/audio/abc123")
+    assert 'RECORDING_ID = "abc123"' in out
 
-    out = render_html(_transcript(), audio_path)
 
+def test_each_segment_rendered_with_timestamp_and_text():
+    out = render_html("rec1", _transcript(), audio_url="/audio/rec1")
     assert "00:00" in out
     assert "00:04" in out
     assert "00:09" in out
@@ -47,39 +42,32 @@ def test_each_segment_rendered_with_timestamp_and_text(tmp_path: Path):
     assert "how are you" in out
 
 
-def test_same_speaker_gets_same_color_across_segments(tmp_path: Path):
-    audio_path = tmp_path / "memo.m4a"
-    audio_path.write_bytes(b"x")
-
-    out = render_html(_transcript(), audio_path)
-
-    # "Speaker 1" appears in segments 0 and 2 -- both occurrences must match.
+def test_same_speaker_gets_same_color_across_segments():
+    out = render_html("rec1", _transcript(), audio_url="/audio/rec1")
     matches = _SPEAKER_COLOR_RE.findall(out)
     speaker_1_colors = {color for color, name in matches if name == "Speaker 1"}
     assert len(speaker_1_colors) == 1
 
 
-def test_different_speakers_get_different_colors(tmp_path: Path):
-    audio_path = tmp_path / "memo.m4a"
-    audio_path.write_bytes(b"x")
-
-    out = render_html(_transcript(), audio_path)
-
+def test_different_speakers_get_different_colors():
+    out = render_html("rec1", _transcript(), audio_url="/audio/rec1")
     colors = _speaker_colors_in(out)
     assert colors["Speaker 1"] != colors["Jane"]
 
 
-def test_text_is_html_escaped(tmp_path: Path):
-    audio_path = tmp_path / "memo.m4a"
-    audio_path.write_bytes(b"x")
+def test_text_is_html_escaped():
     transcript = {
         "source_file": "memo.m4a",
         "segments": [
             {"start": 0.0, "end": 1.0, "speaker": "Speaker 1", "text": "<script>alert(1)</script>"},
         ],
     }
-
-    out = render_html(transcript, audio_path)
-
+    out = render_html("rec1", transcript, audio_url="/audio/rec1")
     assert "<script>alert(1)</script>" not in out
     assert "&lt;script&gt;" in out
+
+
+def test_unlabeled_alias_gets_rename_link_but_named_speaker_does_not():
+    out = render_html("rec1", _transcript(), audio_url="/audio/rec1")
+    assert 'data-alias="Speaker 1"' in out
+    assert 'data-alias="Jane"' not in out

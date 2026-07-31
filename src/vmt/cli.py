@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import subprocess
+import sys
+import time
+import urllib.request
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -11,7 +15,7 @@ from vmt.manifest import Manifest
 from vmt.output import read_transcript, rewrite_transcript, write_transcript
 from vmt.review import apply_rename_and_enroll, list_aliases, sample_line
 from vmt.speakers import SpeakerRegistry, extract_embedding, resolve_speakers
-from vmt.viewer import render_html
+from vmt.webserver import HEALTHZ_BODY
 
 app = typer.Typer(help="Local transcription and speaker diarization for Voice Memos.")
 speakers_app = typer.Typer(help="Manage the known-speaker registry.")
@@ -147,29 +151,47 @@ def review(
         typer.echo(f"Saved {alias_} -> {new_name}")
 
 
+def _server_healthy(port: int) -> bool:
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/healthz", timeout=0.5) as resp:
+            return resp.status == 200 and resp.read() == HEALTHZ_BODY
+    except OSError:
+        return False
+
+
+def _ensure_viewer_server(port: int) -> None:
+    if _server_healthy(port):
+        return
+    subprocess.Popen(
+        [sys.executable, "-m", "vmt.webserver", str(port)],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+    for _ in range(50):
+        if _server_healthy(port):
+            return
+        time.sleep(0.1)
+    typer.echo(f"Viewer server did not come up on port {port}.", err=True)
+    raise typer.Exit(code=1)
+
+
 @app.command()
 def view(recording_id: str) -> None:
-    """Generate and open an HTML viewer: audio player synced to the transcript,
-    color-coded by speaker, click any line to jump playback there."""
+    """Open an interactive HTML viewer: audio synced to the transcript, color-coded
+    by speaker, click any line to jump playback there. Rename an unlabeled speaker
+    right in the page -- it writes straight to the speaker registry, same as
+    `vmt review`, so there's nothing separate to keep in sync."""
     config = load_config()
     json_path = config.transcripts_dir / f"{recording_id}.json"
     if not json_path.exists():
         typer.echo(f"No transcript found for {recording_id}.", err=True)
         raise typer.Exit(code=1)
 
-    transcript = read_transcript(json_path)
-    audio_path = config.recordings_dir / transcript["source_file"]
-    if not audio_path.exists():
-        typer.echo(f"Source audio not found at {audio_path}.", err=True)
-        raise typer.Exit(code=1)
-
-    html_path = config.transcripts_dir / f"{recording_id}.html"
-    html_path.write_text(render_html(transcript, audio_path))
-    typer.echo(f"-> {html_path}")
-
-    import subprocess
-
-    subprocess.run(["open", str(html_path)], check=False)
+    _ensure_viewer_server(config.viewer_port)
+    url = f"http://127.0.0.1:{config.viewer_port}/view/{recording_id}"
+    typer.echo(url)
+    subprocess.run(["open", url], check=False)
 
 
 @speakers_app.command("list")

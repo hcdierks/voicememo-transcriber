@@ -125,12 +125,25 @@ vmt speakers merge SOURCE INTO   # two aliases turned out to be the same person
 ```
 vmt view <recording_id>
 ```
-Generates `data/transcripts/<recording_id>.html` and opens it in your
-browser: an audio player (playing the original recording directly — nothing
-copied) with the transcript below it, color-coded by speaker. Click any line
-to jump playback there; the currently-playing line highlights automatically.
-Use this to sanity-check diarization/speaker-matching accuracy before
-running `vmt review` on a batch.
+Starts a small localhost-only server (once; reused across recordings and
+`vmt view` calls) and opens `http://127.0.0.1:8743/view/<recording_id>` in
+your browser: an audio player (streaming the original recording directly —
+nothing copied) with the transcript below it, color-coded by speaker. Click
+any line to jump playback there; the currently-playing line highlights
+automatically.
+
+Unlabeled speakers (`Speaker 1`, `Speaker 2`, ...) get a **rename** link
+right in the page — click it, type a name, and it writes straight to the
+transcript and the speaker registry via the same code path as `vmt review`.
+There's no separate mapping to keep in sync. The first rename in a session
+takes ~10s (loading the voice-matching model into the server process once);
+later renames in the same session are fast.
+
+The server only binds to `127.0.0.1` and only serves recordings that exist
+in your local manifest. It keeps running in the background after `vmt view`
+returns (so repeat calls are instant); find and stop it with
+`lsof -ti:8743 | xargs kill` if you want it gone. Port configurable via
+`viewer_port` in `~/.config/vmt/config.toml` or `VMT_VIEWER_PORT`.
 
 ## Configuration
 
