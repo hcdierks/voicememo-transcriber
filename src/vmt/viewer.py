@@ -96,7 +96,7 @@ def render_html(recording_id: str, transcript: dict, audio_url: str) -> str:
 {"".join(rows)}
 </div>
 <script>
-  const RECORDING_ID = "{recording_id}";
+  const RECORDING_ID = "{html_lib.escape(recording_id)}";
   const player = document.getElementById('player');
   const segments = Array.from(document.querySelectorAll('.segment'));
 

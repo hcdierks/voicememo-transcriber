@@ -71,3 +71,17 @@ def test_unlabeled_alias_gets_rename_link_but_named_speaker_does_not():
     out = render_html("rec1", _transcript(), audio_url="/audio/rec1")
     assert 'data-alias="Speaker 1"' in out
     assert 'data-alias="Jane"' not in out
+
+
+def test_recording_id_is_escaped_in_script_context():
+    # render_html itself is not the enforcement point for recording_id shape
+    # (webserver.py validates it's a real sha256 hex digest before ever calling
+    # this), but it must not blindly trust its caller either -- escape here too
+    # so breaking out of the `<script>` block's string literal is never possible.
+    malicious_id = 'x";alert(document.title);//'
+    out = render_html(malicious_id, _transcript(), audio_url="/audio/x")
+    # The raw quote must not survive unescaped -- if it did, the assignment
+    # below would close the string literal early and `alert(...)` would run
+    # as a live statement instead of sitting inertly inside the string value.
+    assert 'RECORDING_ID = "x";alert' not in out
+    assert 'RECORDING_ID = "x&quot;;alert' in out

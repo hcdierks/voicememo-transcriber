@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import subprocess
+import subprocess  # nosec B404 -- used only with fixed argv lists below, never shell=True or untrusted strings
 import sys
 import time
 import urllib.request
@@ -10,7 +10,7 @@ from pathlib import Path
 import typer
 
 from vmt.config import load_config
-from vmt.discovery import Recording, find_recordings, hash_file
+from vmt.discovery import Recording, find_recordings, hash_file, is_valid_recording_id
 from vmt.manifest import Manifest
 from vmt.output import read_transcript, rewrite_transcript, write_transcript
 from vmt.review import apply_rename_and_enroll, list_aliases, sample_line
@@ -113,6 +113,10 @@ def review(
     --alias and --name to rename a single alias non-interactively instead,
     e.g. for scripting: `vmt review <id> --alias "Speaker 1" --name Jane`.
     """
+    if not is_valid_recording_id(recording_id):
+        typer.echo(f"Malformed recording_id: {recording_id!r}", err=True)
+        raise typer.Exit(code=1)
+
     config = load_config()
     json_path = config.transcripts_dir / f"{recording_id}.json"
     md_path = config.transcripts_dir / f"{recording_id}.md"
@@ -153,7 +157,9 @@ def review(
 
 def _server_healthy(port: int) -> bool:
     try:
-        with urllib.request.urlopen(f"http://127.0.0.1:{port}/healthz", timeout=0.5) as resp:
+        with urllib.request.urlopen(  # nosec B310 -- fixed http://127.0.0.1 scheme+host, only the local port varies
+            f"http://127.0.0.1:{port}/healthz", timeout=0.5
+        ) as resp:
             return resp.status == 200 and resp.read() == HEALTHZ_BODY
     except OSError:
         return False
@@ -162,7 +168,7 @@ def _server_healthy(port: int) -> bool:
 def _ensure_viewer_server(port: int) -> None:
     if _server_healthy(port):
         return
-    subprocess.Popen(
+    subprocess.Popen(  # nosec B603 -- fixed argv (sys.executable + literal module name), no shell, no untrusted input
         [sys.executable, "-m", "vmt.webserver", str(port)],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
@@ -182,6 +188,10 @@ def view(recording_id: str) -> None:
     by speaker, click any line to jump playback there. Rename an unlabeled speaker
     right in the page -- it writes straight to the speaker registry, same as
     `vmt review`, so there's nothing separate to keep in sync."""
+    if not is_valid_recording_id(recording_id):
+        typer.echo(f"Malformed recording_id: {recording_id!r}", err=True)
+        raise typer.Exit(code=1)
+
     config = load_config()
     json_path = config.transcripts_dir / f"{recording_id}.json"
     if not json_path.exists():
@@ -191,7 +201,7 @@ def view(recording_id: str) -> None:
     _ensure_viewer_server(config.viewer_port)
     url = f"http://127.0.0.1:{config.viewer_port}/view/{recording_id}"
     typer.echo(url)
-    subprocess.run(["open", url], check=False)
+    subprocess.run(["open", url], check=False)  # nosec B603 B607 -- fixed argv, `open` is the macOS system utility
 
 
 @speakers_app.command("list")

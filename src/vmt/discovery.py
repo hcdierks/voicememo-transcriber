@@ -1,11 +1,20 @@
 from __future__ import annotations
 
 import hashlib
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
 AUDIO_EXTENSION = ".m4a"
 _HASH_CHUNK_SIZE = 1024 * 1024
+
+# recording_id is always a sha256 hex digest (see hash_file below). Any value not
+# matching this shape is untrusted input and must never be used to build a path.
+RECORDING_ID_PATTERN = re.compile(r"^[0-9a-f]{64}$")
+
+
+def is_valid_recording_id(recording_id: str) -> bool:
+    return bool(RECORDING_ID_PATTERN.match(recording_id))
 
 
 @dataclass(frozen=True)
