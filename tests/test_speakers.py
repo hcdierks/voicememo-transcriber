@@ -83,3 +83,15 @@ def test_rename_and_merge_update_registry(tmp_path: Path):
 
     registry.merge("Jane (backup mic)", "Jane")
     assert registry.names() == ["Jane"]
+
+
+def test_merge_deletes_the_absorbed_speakers_embedding_file(tmp_path: Path):
+    registry = _registry(tmp_path)
+    registry.enroll("Jane", np.array([1.0, 0.0]))
+    registry.enroll("Jane2", np.array([0.98, 0.02]))
+    absorbed_embedding = tmp_path / "embeddings" / "jane2.npy"
+    assert absorbed_embedding.exists()
+
+    registry.merge("Jane2", "Jane")
+
+    assert not absorbed_embedding.exists()

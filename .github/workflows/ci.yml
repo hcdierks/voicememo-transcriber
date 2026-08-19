@@ -3,10 +3,14 @@ name: CI
 on:
   push:
   pull_request:
+  schedule:
+    - cron: "0 6 * * 1" # weekly ml-extras dependency audit (see ml-dependency-audit job)
+  workflow_dispatch:
 
 jobs:
   test:
     runs-on: macos-latest
+    if: github.event_name != 'schedule'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -18,3 +22,52 @@ jobs:
         run: ruff check src tests
       - name: Test
         run: pytest
+
+  security:
+    runs-on: macos-latest
+    if: github.event_name != 'schedule'
+    permissions:
+      contents: read
+      pull-requests: read # gitleaks-action needs this to list commits on pull_request-triggered runs
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # gitleaks needs full history, not just the latest commit
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install package (core + dev only) and scanners
+        run: |
+          pip install --upgrade pip setuptools
+          pip install -e ".[core,dev]"
+          pip install bandit pip-audit pip-licenses
+      - name: Bandit (static security analysis)
+        run: bandit -r src
+      - name: pip-audit (known CVEs in resolved dependencies)
+        run: pip-audit
+      - name: License compliance (fail on copyleft)
+        run: |
+          pip-licenses --fail-on="GPL;LGPL;AGPL"
+      - name: gitleaks (secrets in working tree + full git history)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  ml-dependency-audit:
+    # Separate, weekly job: the `ml` extra (torch/transformers/pyannote/whisperx)
+    # is where the actual CVEs found in this repo's security audit live, but
+    # installing it is heavy -- so it's scanned weekly (matching Dependabot's
+    # cadence) via the top-level `schedule` trigger, instead of on every push.
+    runs-on: macos-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install package with ML deps
+        run: |
+          pip install -e ".[core,ml,dev]"
+          pip install pip-audit
+      - name: pip-audit (ml extras)
+        run: pip-audit

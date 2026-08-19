@@ -175,3 +175,13 @@ automated tests, and why.
 Recording conversations may require the consent of all parties depending on
 your jurisdiction. This tool does not verify or enforce consent — that's on
 whoever operates it.
+
+This project is MIT-licensed — see [`LICENSE`](LICENSE). It uses several
+third-party pretrained models at runtime; see [`NOTICE.md`](NOTICE.md) for
+attribution, in particular the CC-BY-4.0-licensed
+`pyannote/speaker-diarization-community-1`.
+
+## Contributing / Security
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for development setup and
+[`SECURITY.md`](SECURITY.md) to report a vulnerability privately.

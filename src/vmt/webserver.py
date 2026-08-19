@@ -9,6 +9,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from vmt.config import Config, load_config
+from vmt.discovery import is_valid_recording_id
 from vmt.output import read_transcript, rewrite_transcript
 from vmt.review import apply_rename_and_enroll, list_aliases
 from vmt.speakers import SpeakerRegistry
@@ -71,6 +72,9 @@ class ViewerHandler(BaseHTTPRequestHandler):
         self._handle_rename()
 
     def _serve_view(self, recording_id: str) -> None:
+        if not is_valid_recording_id(recording_id):
+            self.send_error(400, "Malformed recording_id")
+            return
         json_path, _ = _transcript_paths(self.config, recording_id)
         if not json_path.exists():
             self.send_error(404, "Unknown recording_id")
@@ -80,6 +84,9 @@ class ViewerHandler(BaseHTTPRequestHandler):
         self._respond(200, html.encode("utf-8"), "text/html; charset=utf-8")
 
     def _serve_audio(self, recording_id: str) -> None:
+        if not is_valid_recording_id(recording_id):
+            self.send_error(400, "Malformed recording_id")
+            return
         json_path, _ = _transcript_paths(self.config, recording_id)
         if not json_path.exists():
             self.send_error(404, "Unknown recording_id")
@@ -93,6 +100,11 @@ class ViewerHandler(BaseHTTPRequestHandler):
         self._respond(200, data, _guess_mime(audio_path.suffix))
 
     def _handle_rename(self) -> None:
+        origin = self.headers.get("Origin")
+        if origin is not None and origin != f"http://127.0.0.1:{self.server.server_address[1]}":
+            self._json_response(403, {"error": "cross-origin request rejected"})
+            return
+
         length = int(self.headers.get("Content-Length", 0))
         try:
             payload = json.loads(self.rfile.read(length))
@@ -101,6 +113,9 @@ class ViewerHandler(BaseHTTPRequestHandler):
             name = payload["name"].strip()
         except (KeyError, ValueError, json.JSONDecodeError):
             self._json_response(400, {"error": "invalid request"})
+            return
+        if not is_valid_recording_id(recording_id):
+            self._json_response(400, {"error": "malformed recording_id"})
             return
         if not name:
             self._json_response(400, {"error": "name must not be empty"})
