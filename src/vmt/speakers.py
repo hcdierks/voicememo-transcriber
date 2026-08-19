@@ -67,7 +67,10 @@ class SpeakerRegistry:
             raise KeyError(source_name)
         if into_name not in self._names_to_file:
             raise KeyError(into_name)
-        del self._names_to_file[source_name]
+        filename = self._names_to_file.pop(source_name)
+        embedding_path = self.embeddings_dir / filename
+        if embedding_path.exists():
+            embedding_path.unlink()
         self._save()
 
 
@@ -134,7 +137,7 @@ def _load_waveform(audio_path: Path, sample_rate: int = 16000) -> dict:
     ffmpeg 4-7 and is incompatible with newer Homebrew ffmpeg builds. This
     mirrors how whisperx itself loads audio.
     """
-    import subprocess
+    import subprocess  # nosec B404 -- used only with a fixed argv list below, never shell=True
 
     import torch
 
@@ -155,7 +158,7 @@ def _load_waveform(audio_path: Path, sample_rate: int = 16000) -> dict:
         str(sample_rate),
         "-",
     ]
-    out = subprocess.run(cmd, capture_output=True, check=True).stdout
+    out = subprocess.run(cmd, capture_output=True, check=True).stdout  # nosec B603 -- fixed argv, audio_path passed as a single arg, never shell-interpreted
     samples = np.frombuffer(out, np.int16).astype(np.float32) / 32768.0
     waveform = torch.from_numpy(samples).unsqueeze(0)  # (channel, time)
     return {"waveform": waveform, "sample_rate": sample_rate}
