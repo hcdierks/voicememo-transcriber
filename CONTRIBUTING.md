@@ -39,6 +39,26 @@ gitleaks`) scans full git history for accidentally committed secrets:
 gitleaks detect --source . --log-opts="--all"
 ```
 
+## Scope of a full SDLC/security/legal audit
+
+A full audit of this repo (SDLC maturity, security, clean-code, legal/license)
+must inspect **all existing repository collateral**, not just the code and
+history changed since the last one. That includes:
+
+- Every open issue and PR — labels, quality, and staleness, not only new
+  findings the audit itself generates
+- Existing docs (`README.md`, `docs/`, `CONTRIBUTING.md`, `SECURITY.md`, etc.)
+  for accuracy against current code
+- CI/CD configuration and any previously-added scanning tooling, to confirm
+  it's still wired up and actually running, not just present in git history
+- Prior audit findings (closed issues, past PRs) — confirm fixes are still in
+  place and haven't regressed
+
+Rationale: an audit that only looks at what changed since last time will
+silently miss backlog rot (e.g. unlabeled issues, stale docs) that
+accumulated outside the diff it's reviewing. Full traceability requires
+treating the whole repo as in-scope collateral, every time.
+
 ## Reporting a vulnerability instead of contributing a fix
 
 See [`SECURITY.md`](SECURITY.md) — please report privately rather than
