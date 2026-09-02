@@ -14,7 +14,7 @@ license-files = ["LICENSE"]
 [project.optional-dependencies]
 core = [
     "numpy>=2.4.6",
-    "typer>=0.27.1",
+    "typer>=0.27.2",
 ]
 ml = [
     "whisperx>=3.1",
